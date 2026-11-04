@@ -1,0 +1,47 @@
+#!/bin/bash
+# pixel7: the Pixel 7 in Oracle Cloud (chromium-vm), from the Mac over Tailscale.
+#   pixel7 health                        model, Android, booted, user apps
+#   pixel7 test <apk> [seconds] [pkg]    install + launch + wait + crash check; writes ./pixel7-<pkg>-screen.png and -logcat.txt
+#   pixel7 install <apk> | uninstall <pkg> | launch <pkg> [activity] | stop <pkg> | clear <pkg>
+#   pixel7 shot [file.png]               screenshot (default ./pixel7.png)
+#   pixel7 log [lines] [pkg]             logcat
+#   pixel7 tap X Y | swipe X1 Y1 X2 Y2 [ms] | text "..." | key BACK|HOME|ENTER|<code>
+#   pixel7 shell "<command>"             adb shell on the phone
+#   pixel7 screen                        live screen and mouse on the Mac (adb over Tailscale + scrcpy)
+#   pixel7 reset                         factory reset
+# Token: ~/Downloads/API/pixel7-vm.txt (never printed). Door: http://100.102.86.30:8897
+set -euo pipefail
+URL=${PIXEL7_URL:-http://100.102.86.30:8897}
+TOK=$(cat "${PIXEL7_TOKEN_FILE:-$HOME/Downloads/API/pixel7-vm.txt}")
+c() { curl -sS --fail-with-body -H "X-Mantra-Token: $TOK" "$@"; }
+cmd=${1:-health}; shift || true
+case "$cmd" in
+  health) c "$URL/health" ;;
+  install) c --data-binary @"$1" -H "Content-Type: application/vnd.android.package-archive" "$URL/install" ;;
+  test)
+    apk=$1; secs=${2:-10}; pkg=${3:-}
+    out=$(mktemp); c --max-time 900 --data-binary @"$apk" "$URL/test?seconds=$secs${pkg:+&package=$pkg}" > "$out"
+    python3 - "$out" <<'PY'
+import base64, json, sys
+r = json.load(open(sys.argv[1])); p = r.get("package") or "app"
+if r.get("screenshot_png_base64"):
+    open(f"pixel7-{p}-screen.png", "wb").write(base64.b64decode(r.pop("screenshot_png_base64")))
+    print(f"screenshot: pixel7-{p}-screen.png")
+open(f"pixel7-{p}-logcat.txt", "w").write(r.pop("logcat", ""))
+print(f"logcat:     pixel7-{p}-logcat.txt")
+print(json.dumps(r, indent=1))
+PY
+    rm -f "$out" ;;
+  uninstall|stop|clear) c -X POST "$URL/$cmd?package=$1" ;;
+  launch) c -X POST "$URL/launch?package=$1${2:+&activity=$2}" ;;
+  shot) f=${1:-pixel7.png}; c "$URL/screenshot" -o "$f"; echo "$f" ;;
+  log) c "$URL/logcat?lines=${1:-300}${2:+&package=$2}" ;;
+  tap) c -X POST "$URL/tap?x=$1&y=$2" ;;
+  swipe) c -X POST "$URL/swipe?x1=$1&y1=$2&x2=$3&y2=$4&ms=${5:-300}" ;;
+  text) c -X POST -G --data-urlencode "s=$1" "$URL/text" ;;
+  key) c -X POST "$URL/key?code=$1" ;;
+  shell) c --data-binary "$*" "$URL/shell"; echo ;;
+  reset) c --max-time 500 -X POST "$URL/reset" ;;
+  screen) adb connect 100.102.86.30:5555 >/dev/null; exec scrcpy -s 100.102.86.30:5555 --window-title "Pixel 7 (Oracle)" --max-size 1200 --video-bit-rate 4M "$@" ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
