@@ -1,0 +1,38 @@
+# scrcpy client for chromium-vm (Ubuntu 24.04 arm64), built by GitHub (Marko 5.11.2026: compiled only by GitHub).
+# Ubuntu's scrcpy 1.25 is too old for Android 14+: its input thread crashes, the Pixel 7 window takes no clicks.
+# Release scrcpy-v<SCRCPY>: scrcpy-linux-arm64.tar.gz = bin/scrcpy + share/scrcpy/scrcpy-server (official server jar).
+name: scrcpy-arm64
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/scrcpy-arm64.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc git pkg-config meson ninja-build libsdl2-dev libavcodec-dev libavdevice-dev \
+            libavformat-dev libavutil-dev libswresample-dev libusb-1.0-0-dev wget
+      - name: Build
+        run: |
+          V=$(curl -s https://api.github.com/repos/Genymobile/scrcpy/releases/latest | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
+          echo "V=$V" >> $GITHUB_ENV
+          git clone -q --depth 1 --branch "v$V" https://github.com/Genymobile/scrcpy.git src
+          wget -q -O server "https://github.com/Genymobile/scrcpy/releases/download/v$V/scrcpy-server-v$V"
+          cd src && meson setup x --buildtype=release --strip -Db_lto=true -Dprebuilt_server=../server --prefix=/opt/scrcpy
+          ninja -C x && DESTDIR=$PWD/../pkg ninja -C x install
+          cd ../pkg/opt/scrcpy && tar czf $GITHUB_WORKSPACE/scrcpy-linux-arm64.tar.gz bin share/scrcpy
+          ldd bin/scrcpy | awk '{print $1}' > $GITHUB_WORKSPACE/needs.txt; cat $GITHUB_WORKSPACE/needs.txt
+      - name: Release (Latest)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          T="scrcpy-v$V"
+          if gh release view "$T" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then gh release upload "$T" scrcpy-linux-arm64.tar.gz needs.txt --clobber -R "$GITHUB_REPOSITORY"
+          else gh release create "$T" scrcpy-linux-arm64.tar.gz needs.txt --latest --title "scrcpy v$V for chromium-vm (arm64)" --notes "scrcpy client built on ubuntu-24.04-arm for chromium-vm" -R "$GITHUB_REPOSITORY"; fi
