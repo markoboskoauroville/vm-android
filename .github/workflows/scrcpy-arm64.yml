@@ -17,7 +17,15 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q gcc git pkg-config meson ninja-build libsdl2-dev libavcodec-dev libavdevice-dev \
-            libavformat-dev libavutil-dev libswresample-dev libusb-1.0-0-dev wget
+            libavformat-dev libavutil-dev libswresample-dev libusb-1.0-0-dev wget cmake libx11-dev libxext-dev libxrandr-dev \
+            libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev libgl-dev libegl-dev libxkbcommon-dev
+      - name: SDL3 (static; scrcpy 4+ needs it and Ubuntu 24.04 has none)
+        run: |
+          T=$(curl -s https://api.github.com/repos/libsdl-org/SDL/releases/latest | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_name'])")
+          git clone -q --depth 1 --branch "$T" https://github.com/libsdl-org/SDL.git sdl
+          cmake -S sdl -B sdl/b -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_WAYLAND=OFF -DSDL_PULSEAUDIO=OFF \
+            -DSDL_PIPEWIRE=OFF -DSDL_ALSA=ON -DSDL_TESTS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_INSTALL_PREFIX=/usr/local
+          cmake --build sdl/b -j4 && sudo cmake --install sdl/b
       - name: Build
         run: |
           V=$(curl -s https://api.github.com/repos/Genymobile/scrcpy/releases/latest | python3 -c "import sys,json;print(json.load(sys.stdin)['tag_name'].lstrip('v'))")

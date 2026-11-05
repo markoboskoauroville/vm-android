@@ -2,7 +2,7 @@
 # (Re)starts the Pixel 7 container on chromium-vm. adb answers on 127.0.0.1:5555 and on the Tailscale address only.
 # PIXEL7_FRESH=1 wipes /data first (a factory reset).
 set -euo pipefail
-IMG=${IMG:-mantra/pixel7:14}
+IMG=${IMG:-mantra/pixel7:16}   # Android 16 since 5.11.2026; IMG=mantra/pixel7:14 for the old one
 TS=$(tailscale ip -4 2>/dev/null | head -1 || true)
 modprobe binder_linux devices=binder,hwbinder,vndbinder 2>/dev/null || true
 docker rm -f pixel7 >/dev/null 2>&1 || true

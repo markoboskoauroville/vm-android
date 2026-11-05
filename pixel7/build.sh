@@ -1,13 +1,23 @@
 #!/bin/bash
-# Builds the image mantra/pixel7:14 on chromium-vm: redroid 14 (arm64) with every identity property of a Pixel 7
-# (brand google, Google, "Pixel 7", panther, the Pixel 7 Android 14 fingerprint). Run as root on the VM.
+# Builds the image mantra/pixel7:<A> on chromium-vm: redroid <A> (arm64) with every identity property of a Pixel 7
+# (brand google, Google, "Pixel 7", panther, a Pixel 7 fingerprint). Run as root on the VM.
+# 5.11.2026 (Marko: "make the latest Android version there"): Android 16 by default (redroid 16.0.0-latest). The build ID
+# BP2A.250605.031.A2 is the Pixel 7's Android 16 (June 2025) release; its incremental number was not found, so the
+# fingerprint carries the redroid image's own incremental. A=14 still builds the old image.
 set -euo pipefail
-BASE=${BASE:-redroid/redroid:14.0.0-latest}
-OUT=${OUT:-mantra/pixel7:14}
+A=${A:-16}
+BASE=${BASE:-redroid/redroid:$A.0.0-latest}
+OUT=${OUT:-mantra/pixel7:$A}
 W=$(mktemp -d); trap 'rm -rf "$W"; docker rm -f pixel7-props >/dev/null 2>&1 || true' EXIT
-FP='google/panther/panther:14/UQ1A.240205.004/11269751:user/release-keys'
-DESC='panther-user 14 UQ1A.240205.004 11269751 release-keys'
+docker pull -q "$BASE" >/dev/null
 docker create --name pixel7-props "$BASE" >/dev/null
+if [ "$A" = 14 ]; then BID=UQ1A.240205.004; INC=11269751
+else
+  BID=BP2A.250605.031.A2
+  INC=$(docker cp -L pixel7-props:/system/build.prop - | tar xO | sed -n 's/^ro\.build\.version\.incremental=//p' | head -1)
+fi
+FP="google/panther/panther:$A/$BID/$INC:user/release-keys"
+DESC="panther-user $A $BID $INC release-keys"
 FILES="/system/build.prop /vendor/build.prop /system/product/etc/build.prop /system/system_ext/etc/build.prop /vendor/odm/etc/build.prop"
 echo "FROM $BASE" > "$W/Dockerfile"
 for f in $FILES; do
@@ -23,7 +33,7 @@ for f in $FILES; do
     -e "s#^ro\.build\.description=.*#ro.build.description=$DESC#" \
     -e 's/^ro\.build\.product=.*/ro.build.product=panther/' \
     -e 's/^ro\.build\.flavor=.*/ro.build.flavor=panther-user/' \
-    -e 's/^ro\.build\.display\.id=.*/ro.build.display.id=UQ1A.240205.004/' \
+    -e "s/^ro\.build\.display\.id=.*/ro.build.display.id=$BID/" \
     "$W/$n"
   echo "COPY $n $f" >> "$W/Dockerfile"
 done
