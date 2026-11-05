@@ -1,0 +1,32 @@
+#!/bin/bash
+# phones: Marko's Android phones for adb over Tailscale (Marko, 5.11.2026: "If ADB is enabled, Tail Scale is installed,
+# and we are on the same account, it can access my phone and test the application ... working in a virtual machine of
+# Oracle all the time").
+#   phones enable     every phone plugged into this Mac by USB: adb tcpip 5555, so it answers adb on its Tailscale
+#                     address over any network (Wi-Fi or mobile data) until it reboots. The first connection from the
+#                     VM asks "Allow USB debugging?" on the phone: tick "Always allow from this computer".
+#   phones list       the Pixel 7 on chromium-vm and every Android device on the tailnet, adb reachable or not
+#   phones connect    adb connect from this Mac to every reachable phone's Tailscale address
+# Tests then run anywhere: pixel7 --on <phone> test app.apk (Mac), ?device=<phone> on pixel7d, "device" in a cloud job.
+set -uo pipefail
+ADB=${ADB:-$(command -v adb || echo "$HOME/Library/Android/sdk/platform-tools/adb")}
+case "${1:-list}" in
+  enable)
+    found=0
+    for s in $("$ADB" devices | awk 'NR>1 && $2=="device" && $1 !~ /:/ {print $1}'); do
+      found=1
+      model=$("$ADB" -s "$s" shell getprop ro.product.model | tr -d '\r')
+      "$ADB" -s "$s" tcpip 5555 >/dev/null && echo "$model ($s): adb listens on port 5555 until it reboots"
+    done
+    [ $found = 1 ] || { echo "no phone on USB: plug one in, USB debugging on, and allow this Mac"; exit 1; }
+    sleep 3; exec "$0" list ;;
+  list) exec "$(dirname "$0")/pixel7" devices ;;
+  connect)
+    "$(dirname "$0")/pixel7" devices | python3 -c '
+import json, subprocess, sys
+for d in json.load(sys.stdin):
+    if d["name"] != "pixel7" and d.get("adb"):
+        print(d["name"], subprocess.run([sys.argv[1], "connect", d["serial"]], capture_output=True, text=True).stdout.strip())
+' "$ADB" ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

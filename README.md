@@ -55,3 +55,20 @@ Marko: "Running some old emulation from Android, and I cannot click anything ...
   the newest scrcpy (5.0.1, SDL3 static) on GitHub's arm64 runner; release scrcpy-v5.0.1, unpacked into /opt/scrcpy.
 - The VM shows it as its fourth screen (vm-chromium desktop: chromium-vm-pixel7 + chromium-vm-pixel7-bar with
   PORTRAIT | LANDSCAPE and REBOOT).
+
+## 5.11.2026: your own phones over Tailscale
+
+Marko: "test applications inside the virtual machine emulator for Pixel 7, and also on any of my devices connected to
+the network through Tail Scale ... working in a virtual machine of Oracle all the time and accessing my phone".
+- pixel7d takes `?device=NAME` (or header `X-Device`) on every route: `pixel7` (default, the container) or an Android
+  device on the tailnet by its short Tailscale name (`nothing-phone-2a`, `pixel-7`) or ip:port. One lock per device.
+  `GET /devices` lists them: online, adb reachable, model, Android. `/reset` is refused for real phones.
+- A cloud job's job.json takes `"device": "nothing-phone-2a"` the same way (pixel7-jobs).
+- Mac: `pixel7 --on <phone> <command>` and `phones enable | list | connect` (mac/phones → ~/.local/bin/phones).
+- **How a phone answers adb over Tailscale with no Wi-Fi:** Android's "Wireless debugging" switch needs Wi-Fi and
+  turns itself off without it (Android's rule, not Tailscale's). The classic `adb tcpip 5555` does not: once over USB
+  (`phones enable`), adbd listens on every network the phone has, Tailscale over mobile data included, until the phone
+  reboots. The first connection from the VM asks "Allow USB debugging?" on the phone: "Always allow from this
+  computer" (adb's own key check stays on, so the open port is not open to anyone). Without a cable: join any Wi-Fi
+  for a minute (another phone's hotspot does), turn on Wireless debugging, pair, run `adb tcpip 5555` through it, then
+  leave the Wi-Fi. Kept across reboots only with root (`persist.adb.tcp.port`).

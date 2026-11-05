@@ -9,14 +9,20 @@
 #   pixel7 shell "<command>"             adb shell on the phone
 #   pixel7 screen                        live screen and mouse on the Mac (adb over Tailscale + scrcpy)
 #   pixel7 reset                         factory reset
+#   pixel7 devices                       the Pixel 7 and your phones on Tailscale (adb reachable or not)
+#   pixel7 --on <phone> <command> ...    any command on a phone of yours over Tailscale (e.g. --on nothing-phone-2a);
+#                                        the phone needs `phones enable` once over USB after each reboot
 # Token: ~/Downloads/API/pixel7-vm.txt (never printed). Door: http://100.102.86.30:8897
 set -euo pipefail
+DEV=${PIXEL7_DEVICE:-pixel7}
+if [ "${1:-}" = "--on" ]; then DEV=$2; shift 2; fi
 URL=${PIXEL7_URL:-http://100.102.86.30:8897}
 TOK=$(cat "${PIXEL7_TOKEN_FILE:-$HOME/Downloads/API/pixel7-vm.txt}")
-c() { curl -sS --fail-with-body -H "X-Mantra-Token: $TOK" "$@"; }
+c() { curl -sS --fail-with-body -H "X-Mantra-Token: $TOK" -H "X-Device: $DEV" "$@"; }
 cmd=${1:-health}; shift || true
 case "$cmd" in
   health) c "$URL/health" ;;
+  devices) c --max-time 90 "$URL/devices" ;;
   install) c --data-binary @"$1" -H "Content-Type: application/vnd.android.package-archive" "$URL/install" ;;
   test)
     apk=$1; secs=${2:-10}; pkg=${3:-}

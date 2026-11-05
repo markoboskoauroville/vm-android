@@ -38,8 +38,13 @@ def run_job(jid, jdir, out):
         apk = urllib.request.urlopen(req, timeout=600).read()
     else:
         apk = open(os.path.join(jdir, job.get("apk", "app.apk")), "rb").read()
-    with P.LOCK:
+    # 5.11.2026: "device" in job.json = pixel7 (default) or a phone on the tailnet (GET /devices on pixel7d lists them)
+    dev = job.get("device", "pixel7")
+    P.use(dev)
+    with P.lock_for(dev.lower()):
         if not P.booted():
+            if P.serial() != P.SERIAL:
+                raise RuntimeError(f"{dev} is not reachable by adb over Tailscale (plug it in once, `phones enable` on the Mac)")
             ok, txt = P.reset()
             if not ok:
                 raise RuntimeError("pixel7 not booted and reset failed: " + txt)
