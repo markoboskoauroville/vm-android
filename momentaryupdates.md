@@ -7,3 +7,8 @@
 Found on chromium-vm (130.61.181.83, Tailscale 100.102.86.30): Ampere A1 arm64, 2 OCPU, 12 GB, 179 GB free;
 no /dev/kvm ("HYP mode not available": Oracle gives no nested virtualisation), so no emulator or Cuttlefish with
 acceleration; kernel has binder_linux + binderfs as modules, so Android in a container (redroid) can run natively.
+
+## 5.11.2026
+
+(From the vm-chromium session) "Android emulation is very bad ... I cannot click anything ... make the latest Android version there"
+**Status:** Android 15 (16 cannot run without ashmem on this kernel), scrcpy 5.0.1 built by GitHub; clicks and swipes tested.

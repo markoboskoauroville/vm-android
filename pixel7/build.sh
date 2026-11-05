@@ -13,7 +13,9 @@ docker pull -q "$BASE" >/dev/null
 docker create --name pixel7-props "$BASE" >/dev/null
 if [ "$A" = 14 ]; then BID=UQ1A.240205.004; INC=11269751
 else
-  BID=BP2A.250605.031.A2
+  # 16: the Pixel 7's own Android 16 build ID; any other version: the redroid image's own build ID
+  if [ "$A" = 16 ]; then BID=BP2A.250605.031.A2
+  else BID=$(docker cp -L pixel7-props:/system/build.prop - | tar xO | sed -n 's/^ro\.build\.id=//p' | head -1); fi
   INC=$(docker cp -L pixel7-props:/system/build.prop - | tar xO | sed -n 's/^ro\.build\.version\.incremental=//p' | head -1)
 fi
 FP="google/panther/panther:$A/$BID/$INC:user/release-keys"

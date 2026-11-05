@@ -1,6 +1,6 @@
 # vm-android: a Pixel 7 in Oracle Cloud
 
-Android 14 (arm64) runs on **chromium-vm** (Oracle A1, 130.61.181.83, Tailscale 100.102.86.30) beside Ubuntu, in a
+Android 15 (arm64; Android 14 until 5.11.2026) runs on **chromium-vm** (Oracle A1, 130.61.181.83, Tailscale 100.102.86.30) beside Ubuntu, in a
 redroid container dressed as a **Google Pixel 7**: model "Pixel 7", device panther, board gs201, the Pixel 7 Android 14
 fingerprint, 1080x2400, 420 dpi. Chrome and everything else on the machine keeps running. Marko's words:
 [momentaryupdates.md](momentaryupdates.md).
@@ -43,3 +43,15 @@ A cloud session that has a Tailscale auth key (see vm-chromium README) can use p
 No Google Play services (no Google sign-in, FCM, Maps SDK); no real camera, microphone, GPS, Bluetooth, NFC or sensors;
 software rendering (no GPU), so games and video are slow; arm64-v8a/armeabi-v7a apps only. A real thumb on a real phone
 still decides how a gesture feels.
+
+## 5.11.2026: Android 15, scrcpy 5, the fourth VM screen
+
+Marko: "Running some old emulation from Android, and I cannot click anything ... make the latest Android version there".
+- Android 16 (redroid 16.0.0) does not run on this kernel: its gralloc and SystemServer need ashmem, kernel 7.0 has none,
+  and `androidboot.use_memfd=true` does not cover gralloc ("output buffer not gpu writeable", surfaceflinger restarts).
+  Android 15 (redroid 15.0.0-latest, `A=15 pixel7/build.sh`, image mantra/pixel7:15) boots in about 18 s. The Android 14
+  data is kept in /srv/pixel7/data-android14-5.11.2026.
+- Ubuntu's scrcpy 1.25 crashed its input thread on Android 14+ (no clicks). `.github/workflows/scrcpy-arm64.yml` builds
+  the newest scrcpy (5.0.1, SDL3 static) on GitHub's arm64 runner; release scrcpy-v5.0.1, unpacked into /opt/scrcpy.
+- The VM shows it as its fourth screen (vm-chromium desktop: chromium-vm-pixel7 + chromium-vm-pixel7-bar with
+  PORTRAIT | LANDSCAPE and REBOOT).
