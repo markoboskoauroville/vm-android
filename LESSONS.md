@@ -9,3 +9,13 @@
 - **`monkey -p pkg -c LAUNCHER 1` can exit -5 right after an install**; resolve the activity with
   `cmd package resolve-activity --brief -a MAIN -c LAUNCHER pkg` and `am start -W -n` it.
 - **Two processes, one phone**: a threading.Lock does not cover the mailbox runner; use flock on a shared file.
+
+## 5.11.2026
+- Ubuntu's scrcpy 1.25 shows Android 14+ but its control thread dies (NoSuchMethod/NullPointer in the server): no
+  clicks. Use a current scrcpy; there is no arm64 Linux build upstream, so GitHub's ubuntu-24.04-arm runner builds it
+  (scrcpy 4+ needs SDL3: build SDL3 static first).
+- redroid 16 needs ashmem for gralloc and SystemServer; `androidboot.use_memfd=true` is not enough on kernel 7.0. 15 runs.
+- Android's Wireless debugging switch needs Wi-Fi and turns itself off without it; `adb tcpip 5555` over USB listens on
+  every interface (Tailscale over mobile data too) until a reboot. Only root keeps it across reboots.
+- `pkill -f <pattern>` inside `ssh host '...'` matches the ssh command itself and kills it (exit 255).
+- Tailscale's HostName is the display name ("Nothing Phone (2a)"); the short name is the first label of DNSName.
