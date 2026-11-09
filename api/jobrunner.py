@@ -42,6 +42,7 @@ def run_job(jid, jdir, out):
     dev = job.get("device", "pixel7")
     P.use(dev)
     with P.lock_for(dev.lower()):
+        P.ensure_phone()
         if not P.booted():
             if P.serial() != P.SERIAL:
                 raise RuntimeError(f"{dev} is not reachable by adb over Tailscale (plug it in once, `phones enable` on the Mac)")
@@ -79,6 +80,7 @@ def run_job(jid, jdir, out):
                 res["running_after_steps"] = bool(pid)
                 res["logcat_after_steps"] = P.logcat(2000, res["package"]) if pid else ""
         res["steps"] = steps
+        P.mark_used()
     open(os.path.join(out, "logcat.txt"), "w").write(res.pop("logcat", "") + "\n" + res.pop("logcat_after_steps", ""))
     res["device"] = {k: P.prop(k) for k in ("ro.product.model", "ro.product.device", "ro.build.version.release", "ro.build.fingerprint")}
     return res

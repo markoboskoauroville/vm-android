@@ -124,6 +124,22 @@ def devices():
     return out
 
 
+PHONE_TOOL = "/usr/local/lib/chromium-vm/chromium-vm-phone"
+
+
+def ensure_phone():
+    """9.11.2026 (Marko: idle apps are closed, started again on demand): the container pixel7 is stopped by the reaper
+    when nobody used it; a job or a request starts it (docker start, waits for Android) and marks it used. Phones on the
+    tailnet are not ours to start."""
+    if serial() == SERIAL and os.path.exists(PHONE_TOOL):
+        subprocess.run([PHONE_TOOL, "ensure", "1"], capture_output=True, timeout=300)
+
+
+def mark_used():
+    if serial() == SERIAL and os.path.exists(PHONE_TOOL):
+        subprocess.run([PHONE_TOOL, "touch", "1"], capture_output=True, timeout=10)
+
+
 def token():
     with open(TOKEN_FILE) as f:
         return f.read().strip()
@@ -292,6 +308,7 @@ class H(BaseHTTPRequestHandler):
         with lock_for(dev.lower()):
             if method == "GET" and path == "/health":
                 return self.send(200, health())
+            ensure_phone()
             if not booted() and path != "/reset":
                 return self.send(503, {"error": f"{dev} is not booted or not reachable" + ("; POST /reset or run pixel7/run.sh" if serial() == SERIAL else "; GET /devices")})
             if method == "GET" and path == "/screenshot":
