@@ -1,0 +1,175 @@
+# Builds Mantra SonoBus for Linux (x86_64 + arm64), macOS (universal, with the Mantra Bus drivers) and
+# Android, and publishes them together as the release v<VERSION>, marked Latest.
+# SonoBus and BlackHole are fetched at the pinned commits below; scripts/prepare.py turns SonoBus into
+# Mantra SonoBus. Android signing: the secret ANDROID_DEBUG_KEYSTORE_B64 (base64 of a debug.keystore, as in
+# MANTRA_REMOTE_VNC_TAILSCALE) keeps one key across builds; without it a fresh key signs each build.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "scripts/**", "linux/**", "mac/**", "VERSION", ".github/workflows/release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SONOBUS_REPO: https://github.com/sonosaurus/sonobus
+  SONOBUS_COMMIT: 35f1062dab196b9838a4bb529c4bf6592b7f5987
+  BLACKHOLE_REPO: https://github.com/ExistentialAudio/BlackHole
+  BLACKHOLE_COMMIT: 6008d295ff00c8b57412a23564619963f4ecbeac
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      n: ${{ steps.v.outputs.n }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "n=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-22.04,     arch: x86_64 }
+          - { runner: ubuntu-22.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: SonoBus source
+        run: |
+          git init -q sonobus && cd sonobus
+          git fetch -q --depth 1 "$SONOBUS_REPO" "$SONOBUS_COMMIT" && git checkout -q FETCH_HEAD
+          python3 ../scripts/prepare.py . --version ${{ needs.version.outputs.n }}
+      - name: Packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build libjack-jackd2-dev libopus-dev libasound2-dev libx11-dev \
+            libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev libfreetype-dev libcurl4-openssl-dev pkg-config
+      - name: Build
+        working-directory: sonobus
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja -C build SonoBus_Standalone
+      - name: Package
+        run: |
+          d="mantra-sonobus-v${{ needs.version.outputs.n }}-linux-${{ matrix.arch }}"
+          mkdir -p "$d"
+          cp "$(find sonobus/build -name mantra-sonobus -type f | head -1)" "$d/mantra-sonobus"
+          strip "$d/mantra-sonobus" || true
+          cp linux/install-linux.sh linux/mantra-bus.conf "$d/"
+          cp sonobus/images/sonobus_icon_mac_256.png "$d/mantra-sonobus.png"
+          tar czf "$d.tar.gz" "$d"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: mantra-sonobus-*.tar.gz
+
+  macos:
+    needs: version
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sources
+        run: |
+          git init -q sonobus && (cd sonobus && git fetch -q --depth 1 "$SONOBUS_REPO" "$SONOBUS_COMMIT" && git checkout -q FETCH_HEAD)
+          python3 scripts/prepare.py sonobus --version ${{ needs.version.outputs.n }}
+          git init -q blackhole && (cd blackhole && git fetch -q --depth 1 "$BLACKHOLE_REPO" "$BLACKHOLE_COMMIT" && git checkout -q FETCH_HEAD)
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+      - name: Build app (universal)
+        working-directory: sonobus
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja -C build SonoBus_Standalone
+      - name: Build Mantra Bus drivers
+        run: bash mac/build-driver.sh blackhole out
+      - name: Package
+        run: |
+          d="mantra-sonobus-v${{ needs.version.outputs.n }}-macos"
+          mkdir -p "$d"
+          app="$(find sonobus/build -name 'Mantra SonoBus.app' -type d -maxdepth 6 | head -1)"
+          ditto "$app" "$d/Mantra SonoBus.app"
+          codesign --force --deep --sign - "$d/Mantra SonoBus.app"
+          ditto out/MantraBusSend.driver "$d/MantraBusSend.driver"
+          ditto out/MantraBusReturn.driver "$d/MantraBusReturn.driver"
+          cp mac/install-mac.sh "$d/"
+          ditto -c -k --keepParent "$d" "$d.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: mantra-sonobus-*.zip
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: SonoBus source
+        run: |
+          git init -q sonobus && cd sonobus
+          git fetch -q --depth 1 "$SONOBUS_REPO" "$SONOBUS_COMMIT" && git checkout -q FETCH_HEAD
+          python3 ../scripts/prepare.py . --version ${{ needs.version.outputs.n }}
+          cd mobile/Builds/Android && bash fixup.sh
+      - name: NDK and CMake
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;25.2.9519653" "cmake;3.22.1" > /dev/null
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+          else
+            echo "::warning::No ANDROID_DEBUG_KEYSTORE_B64 secret: fresh key, will not install over an older build."
+            keytool -genkeypair -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -keypass android \
+              -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -validity 10000 -noprompt
+          fi
+          echo "DEBUG_KEYSTORE=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
+      - name: Build
+        working-directory: sonobus/mobile/Builds/Android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          apk="$(find app/build/outputs/apk -name '*.apk' | head -1)"
+          cp "$apk" "$GITHUB_WORKSPACE/mantra-sonobus-v${{ needs.version.outputs.n }}-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: mantra-sonobus-*.apk
+
+  release:
+    needs: [version, linux, macos, android]
+    if: always() && needs.version.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release v${{ needs.version.outputs.n }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ needs.version.outputs.n }}
+        run: |
+          ls -la dist
+          [ -n "$(ls dist)" ] || { echo "nothing was built"; exit 1; }
+          notes="Built by GitHub Actions from $GITHUB_SHA. $(git log -1 --format=%s)
+          Linux: ${{ needs.linux.result }}, macOS: ${{ needs.macos.result }}, Android: ${{ needs.android.result }}."
+          if gh release view "v$N" >/dev/null 2>&1; then
+            gh release upload "v$N" dist/* --clobber
+          else
+            gh release create "v$N" dist/* --target "$GITHUB_SHA" --latest --title "v$N" --notes "$notes"
+          fi

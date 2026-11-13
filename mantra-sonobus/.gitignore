@@ -1,0 +1,7 @@
+build/
+sonobus/
+blackhole/
+out/
+*.tar.gz
+*.zip
+*.apk
