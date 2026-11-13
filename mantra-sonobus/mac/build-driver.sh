@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds Mantra Bus for macOS from BlackHole (GPL-3, ExistentialAudio/BlackHole):
-#   MantraBusSend.driver    device "Mantra Bus Send",   32 channels: Ableton plays into it, Mantra SonoBus reads it
-#   MantraBusReturn.driver  device "Mantra Bus Return", 32 channels: Mantra SonoBus plays into it, Ableton records it
+#   MantraBusSend.driver    device "Mantra Bus Send",   64 channels: Ableton plays into it, Mantra SonoBus reads it
+#   MantraBusReturn.driver  device "Mantra Bus Return", 64 channels: Mantra SonoBus plays into it, Ableton records it
 # Two drivers, two separate loopbacks, so what you receive never goes back out.
 #
 #   mac/build-driver.sh <BlackHole checkout> <output dir>
@@ -26,7 +26,7 @@ build_one () {
     echo "#define kDevice_Name \"Mantra Bus $kind\""
     echo "#define kDevice2_Name \"Mantra Bus $kind Mirror\""
     echo "#define kManufacturer_Name \"Mantra\""
-    echo "#define kNumber_Of_Channels 32"
+    echo "#define kNumber_Of_Channels 64"
     echo "#define kEnableVolumeControl false"
     echo "#define kCanBeDefaultSystemDevice false"
     cat "$work/BlackHole/BlackHole.c"

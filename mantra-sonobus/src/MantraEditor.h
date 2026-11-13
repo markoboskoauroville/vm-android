@@ -1,6 +1,6 @@
 // Mantra SonoBus: the whole user interface.
 // A strip of VU meters (what this machine SENDS on the left, what it HEARS on the right).
-// A click on the strip opens the panel: channels (2..32), quality, input and output devices,
+// A click on the strip opens the panel: channels (2..32 or any custom count up to 64), quality, input and output devices,
 // and every machine on the tailnet with SEND and RECEIVE switches.
 // The engine underneath is SonoBus (SonobusAudioProcessor), unchanged.
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -31,6 +31,7 @@ public:
 
     //== used by the panel ==================================================
     static constexpr int kChannelChoices[] = { 2, 4, 8, 16, 24, 32 };
+    static constexpr int kMaxChannels = 64;   // SonoBus' limit; Mantra Bus has 64 channels too
     enum Quality { QualityLight = 0, QualityAuto, QualityHigh, QualityLossless };
 
     struct Machine {

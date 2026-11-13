@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mantra SonoBus for macOS: the app (into /Applications) + Mantra Bus Send / Return (32-channel drivers).
+# Mantra SonoBus for macOS: the app (into /Applications) + Mantra Bus Send / Return (64-channel drivers).
 #
 #   curl -fsSL https://raw.githubusercontent.com/markoboskoauroville/MANTRA_SONOBUS/main/mac/install-mac.sh | bash
 #
@@ -36,5 +36,5 @@ for d in MantraBusSend MantraBusReturn; do
 done
 sudo killall -9 coreaudiod 2>/dev/null || true   # Core Audio restarts by itself and loads the drivers
 
-echo "Done: /Applications/Mantra SonoBus.app, devices 'Mantra Bus Send' and 'Mantra Bus Return' (32 ch)."
+echo "Done: /Applications/Mantra SonoBus.app, devices 'Mantra Bus Send' and 'Mantra Bus Return' (64 ch)."
 open "/Applications/Mantra SonoBus.app"

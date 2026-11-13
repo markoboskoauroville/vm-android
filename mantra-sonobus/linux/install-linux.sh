@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mantra SonoBus for Linux: the app + Mantra Bus (two 32-channel virtual devices).
+# Mantra SonoBus for Linux: the app + Mantra Bus (two 64-channel virtual devices).
 #
 #   curl -fsSL https://raw.githubusercontent.com/markoboskoauroville/MANTRA_SONOBUS/main/linux/install-linux.sh | bash
 #
@@ -70,22 +70,22 @@ if pgrep -x pipewire >/dev/null; then
   mkdir -p "$HOME/.config/pipewire/pipewire.conf.d"
   install -m 644 "$here/mantra-bus.conf" "$HOME/.config/pipewire/pipewire.conf.d/mantra-bus.conf"
   systemctl --user restart pipewire pipewire-pulse 2>/dev/null || true
-  echo "Mantra Bus Send / Mantra Bus Return: PipeWire devices, 32 channels each."
+  echo "Mantra Bus Send / Mantra Bus Return: PipeWire devices, 64 channels each."
 elif command -v pactl >/dev/null; then
-  map=$(seq -s, -f 'aux%g' 0 31)
+  map=$(seq -s, -f 'aux%g' 0 63)
   for n in send return; do
     pactl list short sinks | grep -q "mantra_bus_$n" || \
-      pactl load-module module-null-sink sink_name="mantra_bus_$n" channels=32 channel_map="$map" \
+      pactl load-module module-null-sink sink_name="mantra_bus_$n" channels=64 channel_map="$map" \
         sink_properties=device.description="Mantra\ Bus\ ${n^}" >/dev/null
   done
   mkdir -p "$HOME/.config/pulse"
   grep -q mantra_bus "$HOME/.config/pulse/default.pa" 2>/dev/null || {
     [ -f "$HOME/.config/pulse/default.pa" ] || echo ".include /etc/pulse/default.pa" > "$HOME/.config/pulse/default.pa"
     for n in send return; do
-      echo "load-module module-null-sink sink_name=mantra_bus_$n channels=32 channel_map=$map sink_properties=device.description=Mantra_Bus_${n^}" >> "$HOME/.config/pulse/default.pa"
+      echo "load-module module-null-sink sink_name=mantra_bus_$n channels=64 channel_map=$map sink_properties=device.description=Mantra_Bus_${n^}" >> "$HOME/.config/pulse/default.pa"
     done
   }
-  echo "Mantra Bus Send / Mantra Bus Return: PulseAudio null sinks, 32 channels each."
+  echo "Mantra Bus Send / Mantra Bus Return: PulseAudio null sinks, 64 channels each."
 else
   echo "No PipeWire or PulseAudio running: Mantra Bus not created (the app still works with real devices)."
 fi

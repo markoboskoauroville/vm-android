@@ -118,6 +118,17 @@ public:
             b->onClick = [this, n] { ed.setChannels (n); refresh(); };
             addAndMakeVisible (b);
         }
+        setupEdit (customEdit, "");
+        customEdit.setInputRestrictions (2, "0123456789");
+        customEdit.setJustification (Justification::centred);
+        customEdit.setTextToShowWhenEmpty ("custom", MantraColours::dim);
+        customEdit.setTooltip ("any number of channels, 1 to 64");
+        customEdit.onReturnKey = customEdit.onFocusLost = [this] {
+            const int v = customEdit.getText().getIntValue();
+            if (v >= 1 && v <= MantraEditor::kMaxChannels && v != ed.getChannels()) ed.setChannels (v);
+            refresh();
+        };
+
         const char* qnames[] = { "LIGHT", "AUTO", "HIGH", "LOSSLESS" };
         for (int i = 0; i < 4; ++i) {
             auto* b = qualButtons.add (new TextButton (qnames[i]));
@@ -190,8 +201,9 @@ public:
         chanLabel.setBounds (r.removeFromTop (lab));
         {
             auto row = r.removeFromTop (rowH);
-            const int w = row.getWidth() / 6;
+            const int w = row.getWidth() / 7;
             for (auto* b : chanButtons) b->setBounds (row.removeFromLeft (w).reduced (2, 2));
+            customEdit.setBounds (row.reduced (2, 2));
         }
         qualLabel.setBounds (r.removeFromTop (lab));
         {
@@ -237,8 +249,17 @@ public:
     void refresh()
     {
         const int n = ed.getChannels();
-        for (int i = 0; i < chanButtons.size(); ++i)
+        bool preset = false;
+        for (int i = 0; i < chanButtons.size(); ++i) {
             paintToggle (*chanButtons[i], MantraEditor::kChannelChoices[i] == n);
+            preset |= MantraEditor::kChannelChoices[i] == n;
+        }
+        if (! customEdit.hasKeyboardFocus (true)) {
+            customEdit.setText (preset ? String() : String (n), false);
+            customEdit.setColour (TextEditor::backgroundColourId, preset ? MantraColours::bg : MantraColours::on);
+            customEdit.setColour (TextEditor::textColourId, preset ? MantraColours::text : Colours::white);
+            customEdit.applyColourToAllText (preset ? MantraColours::text : Colours::white);
+        }
         for (int i = 0; i < qualButtons.size(); ++i)
             paintToggle (*qualButtons[i], ed.getQuality() == i);
         bwLabel.setText (ed.describeBandwidth(), dontSendNotification);
@@ -468,7 +489,7 @@ private:
 
     MantraEditor& ed;
     Label title, nameLabel, chanLabel, qualLabel, bwLabel, inLabel, outLabel, machLabel, meetLabel, meetStatus, recInfo;
-    TextEditor nameEdit, addEdit, meetEdit;
+    TextEditor nameEdit, addEdit, meetEdit, customEdit;
     OwnedArray<TextButton> chanButtons, qualButtons;
     ComboBox typeBox, inBox, outBox;
     Viewport viewport;
@@ -520,9 +541,7 @@ MantraEditor::MantraEditor (SonobusAudioProcessor& p)
     quality      = settings->getIntValue ("quality", QualityAuto);
     meetingPoint = settings->getValue ("meetingPoint", kDefaultMeetingPoint);
 
-    bool validChannels = false;
-    for (auto c : kChannelChoices) validChannels |= (c == channels);
-    if (! validChannels) channels = 2;
+    if (channels < 1 || channels > kMaxChannels) channels = 2;
 
     listener = std::make_unique<Listener> (*this);
     proc.addClientListener (listener.get());
@@ -796,14 +815,15 @@ String MantraEditor::peerKey (int index) const
 int MantraEditor::getKbpsPerChannel() const
 {
     // the bitrate per channel falls as the channel count rises, so 32 channels stay near 1.5 Mbit/s
-    static const int table[3][6] = {
+    static const int table[3][6] = {   // per preset: 2, 4, 8, 16, 24, 32 channels
         {  64,  48, 48, 24, 24, 16 },   // LIGHT
         { 128,  96, 96, 64, 48, 48 },   // AUTO
         { 256, 160, 128, 96, 96, 64 },  // HIGH
     };
     if (quality == QualityLossless) return 0;
-    int idx = 0;
-    for (int i = 0; i < 6; ++i) if (kChannelChoices[i] == channels) idx = i;
+    // a custom count takes the rate of the next preset up (12 ch -> the 16 ch rate), above 32 the 32 ch rate
+    int idx = 5;
+    for (int i = 5; i >= 0; --i) if (kChannelChoices[i] >= channels) idx = i;
     return table[jlimit (0, 2, quality)][idx];
 }
 
@@ -926,7 +946,7 @@ void MantraEditor::applyAudioSetup()
 
 void MantraEditor::setChannels (int n)
 {
-    channels = n;
+    channels = jlimit (1, kMaxChannels, n);
     settings->setValue ("channels", n);
     applyAudioSetup();
     applyEngine();

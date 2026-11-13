@@ -1,7 +1,7 @@
 # Mantra SonoBus
 
 Audio between your own machines over Tailscale: send, receive, listen and record, in any combination,
-2 to 32 channels. Built on [SonoBus](https://github.com/sonosaurus/sonobus) (its audio engine, unchanged),
+2 to 32 channels (or any custom count up to 64). Built on [SonoBus](https://github.com/sonosaurus/sonobus) (its audio engine, unchanged),
 with one screen: a strip of VU meters.
 
 - **The strip.** Left half is **SEND** (what leaves this machine, one bar per channel), right half is
@@ -9,7 +9,8 @@ with one screen: a strip of VU meters.
   On a computer the strip sits at the bottom of the screen, always on top; drag it to move it.
   On Android it is the bottom of the app.
 - **Click the strip** for the panel:
-  - **CHANNELS** 2 (stereo), 4, 8, 16, 24, 32, like the CQ mixer's stereo or multitrack USB mode.
+  - **CHANNELS** 2 (stereo), 4, 8, 16, 24, 32, like the CQ mixer's stereo or multitrack USB mode, or type any
+    count from 1 to 64 in the custom field.
   - **QUALITY** LIGHT / AUTO / HIGH / LOSSLESS. The bitrate per channel drops as the channel count
     rises (AUTO: 128 kbps/ch at 2 ch, 64 at 16, 48 at 32, so 32 channels are about 1.5 Mbit/s per link).
     The panel shows the total.
@@ -20,14 +21,14 @@ with one screen: a strip of VU meters.
 
 ## Mantra Bus: the virtual driver
 
-Two virtual devices with 32 channels each, like BlackHole:
+Two virtual devices with 64 channels each, like BlackHole:
 
 | Device | Who plays into it | Who reads it |
 |---|---|---|
 | **Mantra Bus Send** | Ableton (or any app) | Mantra SonoBus → the other machines |
 | **Mantra Bus Return** | Mantra SonoBus ← the other machines | Ableton records it |
 
-Two devices so that what you receive never goes back out. Use as many of the 32 channels as the
+Two devices so that what you receive never goes back out. Use as many of the 64 channels as the
 CHANNELS setting says; channel N on one machine arrives as channel N on the other.
 
 Example, multitrack from Ableton on the Mac to a recorder on the VM: on the Mac, Ableton output =
